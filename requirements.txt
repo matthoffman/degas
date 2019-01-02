@@ -12,3 +12,4 @@ seaborn
 pylint
 mypy
 black
+pytest

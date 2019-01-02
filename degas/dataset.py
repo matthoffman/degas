@@ -96,7 +96,7 @@ def load_majestic_million(path: Path) -> pd.DataFrame:
 
 
 def load_subset(path: Path) -> pd.DataFrame:
-    """ This subset is supposed to be like the one given in the prompt, although probably not as diabolical
+    """ A small subset of the input data, for testing purposes.
     """
     # chr(1) is ctrl-A, which is a pretty vile separator char, TBH. I mean, couldn't it at least be ctrl-^
     # ("record separator") or ctrl-_ ("unit separator")?
