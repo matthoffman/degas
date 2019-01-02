@@ -1,0 +1,14 @@
+python=3.6.7
+pandas>=0.22
+numpy
+python-dotenv
+scikit-learn>=0.20
+tensorflow=1.12.0
+typing
+Click
+matplotlib
+seaborn
+# some dev tools:
+pylint
+mypy
+black
