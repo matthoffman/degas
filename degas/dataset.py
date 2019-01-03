@@ -8,9 +8,9 @@ from csv import QUOTE_ALL
 # from sklearn.model_selection import train_test_split
 
 
-#####################
-# some constants
-#####################
+##########################################
+# some constants for use in other files
+##########################################
 
 # key for our dataframe that contains the data (the domains)
 DATA_KEY = 'domain'
@@ -28,7 +28,10 @@ def process(input_filepath: str, output_filepath: str) -> None:
     logger.info('making final data set from raw data')
 
     logger.info("Loading DGA datasets")
-    dgas = concat([load_andrewaeva(join(input_filepath, "andrewaeva-dga-list.csv.gz")),
+    dgas = concat([
+        # good wordlist, but the code is GPL so by the default the data is as well (although it's compiled from a
+        # variety of public-domain sources)
+        # load_andrewaeva(join(input_filepath, "andrewaeva-dga-list.csv.gz")),
                    load_bambenek(join(input_filepath, "bambenek.*.csv.gz"))],
                   dga=True)
 
@@ -46,17 +49,11 @@ def process(input_filepath: str, output_filepath: str) -> None:
     full.to_csv(join(output_filepath, DATASET_FILENAME), header=True, index=False, compression="gzip")
     logger.info("dataset creation complete. dataset.csv.gz written to %s", output_filepath)
 
-    # train, test = train_test_split(full, test_size=0.2)
-    # train: pd.DataFrame
-
-    # logger.info("created a training set of %i records (of which %.2f%% are DGAs) and a test set of %i records "
-    #      "(of which %.2f%% are DGAs)", len(train), train[LABEL_KEY].mean()*100, len(test), test[LABEL_KEY].mean()*100)
-    # train.to_csv(join(output_filepath, "train.csv.gz"), header=True, index=False, compression="gzip")
-    # test.to_csv(join(output_filepath, "test.csv.gz"), header=True, index=False, compression="gzip")
-    # logger.info("dataset creation complete. test.csv and train.csv written to %s", output_filepath)
-
 
 def concat(dataframes: List[pd.DataFrame], dga=False) -> pd.DataFrame:
+    """
+    Concatenate dataframes containing all DGAs or all benign domains and add a column indicating their label.
+    """
     df = pd.concat(dataframes, ignore_index=True)
     if dga:
         df[LABEL_KEY] = 1
@@ -161,7 +158,6 @@ def load_alexa(path: Path) -> pd.DataFrame:
 
 def join(base: str, filename: str) -> Path:
     """
-    Yes, we could use os.path.join, but for reasons I no longer remember I'm passing around Path objects instead.
-    Maybe I intended to use some of the cleverness that Path allows?
+    Yes, we could use os.path.join, but I wanted to deal in Path objects instead
     """
     return Path(base).joinpath(filename)

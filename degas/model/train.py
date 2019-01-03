@@ -1,77 +1,24 @@
 import logging
 from typing import List
 
-import numpy as np
+import os
 import pandas as pd
+import numpy as np
 from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
 import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, History
-from tensorflow.keras.layers import Conv1D, MaxPooling1D, ThresholdedReLU, Embedding
-from tensorflow.keras.layers import Input, Flatten, Dense, Dropout
-from tensorflow.keras.models import Model
-from tensorflow.keras.preprocessing import sequence
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_auc_score
+import sklearn
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, History
+from tensorflow.python.keras.layers import Conv1D, MaxPooling1D, ThresholdedReLU, Embedding
+from tensorflow.python.keras.layers import Input, Flatten, Dense, Dropout
+from tensorflow.python.keras.models import Model
 from sklearn.model_selection import train_test_split, StratifiedKFold
+
+from .helpers import prep_data
 
 # TODO: temporarily commenting this out, but worth revisiting to remove the magic strings
 # from ..dataset import DATA_KEY, LABEL_KEY, DATASET_FILENAME
 
-# See: https://github.com/Yuren-Zhong/DeepDGA/blob/master/train.py
-
-# Static dictionary of allowed characters in domains.
-# Not elegant, but does the job. Could create it algorithmically using ord() or whatever, but at the end of the day this
-# is easier to grok.
-# Note that I *thought* that the new TLDs introduced a much wider assortment of allowed characters, but this dictionary
-# was built from the actual characters pulled from our test set. May be something to revisit, though.
-# To reconstruct:
-# dict = {chr(i):i-48 for i in range(48,59)}
-# dict.update({chr(i):len(dict)+i-45 for i in range(45,48)})
-# dict['_'] = len(dict)
-# dict.update({chr(i):len(dict)+i-97 for i in range(97,123)})
-domain_name_dictionary = {'0': 0,
-                          '1': 1,
-                          '2': 2,
-                          '3': 3,
-                          '4': 4,
-                          '5': 5,
-                          '6': 6,
-                          '7': 7,
-                          '8': 8,
-                          '9': 9,
-                          ':': 10,
-                          '-': 11,
-                          '.': 12,
-                          '/': 13,
-                          '_': 14,
-                          'a': 15,
-                          'b': 16,
-                          'c': 17,
-                          'd': 18,
-                          'e': 19,
-                          'f': 20,
-                          'g': 21,
-                          'h': 22,
-                          'i': 23,
-                          'j': 24,
-                          'k': 25,
-                          'l': 26,
-                          'm': 27,
-                          'n': 28,
-                          'o': 29,
-                          'p': 30,
-                          'q': 31,
-                          'r': 32,
-                          's': 33,
-                          't': 34,
-                          'u': 35,
-                          'v': 36,
-                          'w': 37,
-                          'x': 38,
-                          'y': 39,
-                          'z': 40,
-                          np.NaN: 41}
+logger = logging.getLogger(__name__)
 
 
 def build_model() -> Model:
@@ -102,33 +49,50 @@ def build_model() -> Model:
     return model
 
 
-def domain_to_ints(domain: str) -> List[int]:
-    """
-    Converts the given domain into a list of ints, given the static dictionary defined above.
-    Converts the domain to lower case, and uses a set value (mapped to np.NaN) for unknown characters.
-    """
-    return [domain_name_dictionary.get(y, domain_name_dictionary.get(np.NaN)) for y in domain.lower()]
-
-
-def get_callbacks(weights_filename, patience_stopping=5, patience_lr=10):
+def get_callbacks(model_filename, patience_stopping=5, patience_lr=10):
     early_stopping = EarlyStopping(monitor='val_loss', patience=patience_stopping, verbose=1)
-    mcp_save = ModelCheckpoint(weights_filename, save_best_only=True, monitor='val_loss', mode='min')
+    mcp_save = ModelCheckpoint(model_filename, save_best_only=True, monitor='val_loss', mode='min')
     reduce_lr_loss = ReduceLROnPlateau(monitor='loss', factor=0.1, patience=patience_lr, verbose=1, epsilon=1e-4,
                                        mode='min')
     return [early_stopping, mcp_save, reduce_lr_loss]
 
 
-def fit_and_evaluate(model: Model, weights_filename: str, t_x, val_x, t_y, val_y, epochs=20, batch_size=128) -> History:
-    results = model.fit(t_x, t_y, epochs=epochs, batch_size=batch_size, callbacks=get_callbacks(weights_filename),
+def fit_and_evaluate(model: Model, model_filename: str, t_x, val_x, t_y, val_y, epochs=20, batch_size=128) -> History:
+    results = model.fit(t_x, t_y, epochs=epochs, batch_size=batch_size, callbacks=get_callbacks(model_filename),
                         verbose=1, validation_data=[val_x, val_y])
     logging.info("Score against validation set: %s", model.evaluate(val_x, val_y))
     return results
 
 
+def print_metrics(val_y: np.ndarray, predict_y: np.ndarray):
+    confmatrix: np.ndarray = sklearn.metrics.confusion_matrix(val_y, predict_y)
+
+    tn, fp, fn, tp = confmatrix.ravel()
+    num_pred_positives = tp + fp
+    num_positives = tp + fn
+    num_negatives = tn + fp
+    precision = tp / num_pred_positives
+    recall = tp / num_positives
+    fpr = fp / num_negatives
+    fnr = fn / num_positives
+    # sklearn could calculate this for us as well
+    f1 = 2 * (precision * recall) / (precision + recall)
+    logger.info("precision: %.2f, TPR (recall): %.2f, FPR: %.2f, FNR (miss rate): %.2f. f1 score: %.2f",
+                precision, recall, fpr, fnr, f1)
+    print("precision: {}, TPR (recall): {}, FPR: {}, FNR (miss rate): {}. f1 score: {}".format(
+                precision, recall, fpr, fnr, f1))
+
+    # or, just let sklearn do it for us, and even print a pretty table :)
+    report = sklearn.metrics.classification_report(val_y, predict_y)
+    logger.info(report)
+    print(report)
+    return confmatrix, precision, recall, f1
+
+
 def export_model(model: Model):
     # Ignore dropout at inference
     tf.keras.backend.set_learning_phase(0)
-    export_path = 'models/degas/1'
+    export_path = os.path.join('models', 'degas', '1')
     with tf.keras.backend.get_session() as sess:
         tf.saved_model.simple_save(
             sess,
@@ -138,7 +102,6 @@ def export_model(model: Model):
 
 
 def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> History:
-    logger = logging.getLogger("train")
     # Convert characters to lists of ints and pad them
     logger.info("Preparing data")
     X, y = prep_data(data, max_length)
@@ -150,9 +113,12 @@ def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> Hi
     model: Model = build_model()
 
     logger.info("Starting training")
-    weights_filename = "nyu_model_weights.h5"
-    history: History = fit_and_evaluate(model, weights_filename, t_x, val_x, t_y, val_y, num_epochs, batch_size)
+    model_filename = os.path.join("models", "degas", "nyu_model.h5")
+    history: History = fit_and_evaluate(model, model_filename, t_x, val_x, t_y, val_y, num_epochs, batch_size)
     logger.info("Last training history: " + str(history))
+
+    predict_y = model.predict(val_x, batch_size=batch_size, verbose=1)
+    print_metrics(val_y, predict_y)
 
     export_model(model)
 
@@ -185,31 +151,8 @@ def run_kfold(data: pd.DataFrame, num_epochs=100, kfold_splits=2, batch_size=256
         accuracy_history = history.history['acc']
         # val_accuracy_history = history.history['val_acc']
         logger.info("Last training accuracy: " + str(accuracy_history[-1]))
-        # t_probs = model.predict_on_batch(holdout["domain_ints"])
-        # t_auc = roc_auc_score(holdout[LABEL_KEY], t_probs)
-        #
-        # logger.info('Epoch %d: auc = %f (best=%f)', ep, t_auc, best_auc)
-        #
-        # if t_auc > best_auc:
-        #     best_auc = t_auc
-        #     best_iter = ep
-        #
-        #     probs = model.predict_on_batch(test["domain_ints"])
-        #     confmatrix = confusion_matrix(test[DATA_KEY], probs > .5)
-        #     out_data = {'y': test[DATA_KEY], 'labels': test[LABEL_KEY], 'probs': probs, 'epochs': ep,
-        #                 'confusion_matrix': confmatrix}
-        #
-        #     logger.info("Confusion matrix: %s", confmatrix)
 
     return model_history
-
-
-def prep_data(data, max_length):
-    X = (data["domain"]
-         .apply(lambda x: domain_to_ints(x))
-         .pipe(sequence.pad_sequences, maxlen=max_length))
-    y = data["class"]
-    return X, y
 
 
 def main(input_filepath: str, epochs: int = 100, kfold_splits: int = 3) -> None:
@@ -226,16 +169,3 @@ def main(input_filepath: str, epochs: int = 100, kfold_splits: int = 3) -> None:
         run_kfold(data, num_epochs=epochs, kfold_splits=kfold_splits)
     else:
         run(data, num_epochs=epochs)
-
-
-if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-
-    # not used in this stub but often useful for finding various files
-    project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
-    main()
