@@ -13,12 +13,27 @@ from tensorflow.python.keras.layers import Input, Flatten, Dense, Dropout
 from tensorflow.python.keras.models import Model
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
-from .helpers import prep_data
+from .helpers import prep_dataframe, prep_data, print_metrics
 
 # TODO: temporarily commenting this out, but worth revisiting to remove the magic strings
 # from ..dataset import DATA_KEY, LABEL_KEY, DATASET_FILENAME
 
 logger = logging.getLogger(__name__)
+
+
+def as_keras_metric(method):
+    """ from https://stackoverflow.com/questions/43076609/how-to-calculate-precision-and-recall-in-keras """
+    import functools
+
+    @functools.wraps(method)
+    def wrapper(self, args, **kwargs):
+        """ Wrapper for turning tensorflow metrics into keras metrics """
+        value, update_op = method(self, args, **kwargs)
+        tf.keras.backend.get_session().run(tf.local_variables_initializer())
+        with tf.control_dependencies([update_op]):
+            value = tf.identity(value)
+        return value
+    return wrapper
 
 
 def build_model() -> Model:
@@ -45,7 +60,10 @@ def build_model() -> Model:
     drop = Dropout(0.5)(thresh_fc)
     output = Dense(1, activation='sigmoid')(drop)
     model = Model(inputs=main_input, outputs=output)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['mae', 'mean_squared_error', 'acc'])
+    precision = as_keras_metric(tf.metrics.precision)
+    recall = as_keras_metric(tf.metrics.recall)
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['mae', 'mean_squared_error', 'acc', precision,
+                                                                         recall])
     return model
 
 
@@ -64,31 +82,6 @@ def fit_and_evaluate(model: Model, model_filename: str, t_x, val_x, t_y, val_y, 
     return results
 
 
-def print_metrics(val_y: np.ndarray, predict_y: np.ndarray):
-    confmatrix: np.ndarray = sklearn.metrics.confusion_matrix(val_y, predict_y)
-
-    tn, fp, fn, tp = confmatrix.ravel()
-    num_pred_positives = tp + fp
-    num_positives = tp + fn
-    num_negatives = tn + fp
-    precision = tp / num_pred_positives
-    recall = tp / num_positives
-    fpr = fp / num_negatives
-    fnr = fn / num_positives
-    # sklearn could calculate this for us as well
-    f1 = 2 * (precision * recall) / (precision + recall)
-    logger.info("precision: %.2f, TPR (recall): %.2f, FPR: %.2f, FNR (miss rate): %.2f. f1 score: %.2f",
-                precision, recall, fpr, fnr, f1)
-    print("precision: {}, TPR (recall): {}, FPR: {}, FNR (miss rate): {}. f1 score: {}".format(
-                precision, recall, fpr, fnr, f1))
-
-    # or, just let sklearn do it for us, and even print a pretty table :)
-    report = sklearn.metrics.classification_report(val_y, predict_y)
-    logger.info(report)
-    print(report)
-    return confmatrix, precision, recall, f1
-
-
 def export_model(model: Model):
     # Ignore dropout at inference
     tf.keras.backend.set_learning_phase(0)
@@ -104,7 +97,8 @@ def export_model(model: Model):
 def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> History:
     # Convert characters to lists of ints and pad them
     logger.info("Preparing data")
-    X, y = prep_data(data, max_length)
+    X: np.ndarray = prep_data(data["domain"], max_length)
+    y: np.ndarray = data["class"]
     t_x, val_x, t_y, val_y = train_test_split(X, y, test_size=0.2)
     logger.info("created a training set of %i records (of which %.2f%% are DGAs) and a test set of %i records "
                 "(of which %.2f%% are DGAs)", len(t_x), t_y.mean() * 100, len(val_x), val_y.mean() * 100)
@@ -127,13 +121,14 @@ def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> Hi
 
 def run_kfold(data: pd.DataFrame, num_epochs=100, kfold_splits=2, batch_size=256, max_length=75) -> List[History]:
     """
-    Variant of run that uses Stratified KFold
+    Variant of run that uses Stratified KFold.
+    Not currently used (kfold isn't necessary with this dataset) but kept around for the moment in case it's useful.
     """
     logger = logging.getLogger(__name__)
 
     logger.info("Preparing dataset")
     # Convert characters to lists of ints and pad them
-    X, y = prep_data(data, max_length)
+    X, y = prep_dataframe(data, max_length)
     # TODO: pull out a holdout set (test set) to test against after kfold?
 
     # save the model history in a list after fitting so that we can plot later
