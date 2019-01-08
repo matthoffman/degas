@@ -112,7 +112,7 @@ def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> Hi
     logger.info("Last training history: " + str(history))
 
     predict_y = model.predict(val_x, batch_size=batch_size, verbose=1)
-    print_metrics(val_y, predict_y)
+    print_metrics(val_y, predict_y > .5)
 
     export_model(model)
 
