@@ -35,7 +35,10 @@ def domain_to_ints(domain: str) -> List[int]:
     Converts the given domain into a list of ints, given the static dictionary defined above.
     Converts the domain to lower case, and uses a set value (mapped to np.NaN) for unknown characters.
     """
-    return [domain_name_dictionary.get(y, domain_name_dictionary.get(np.NaN)) for y in domain.lower()]
+    return [
+        domain_name_dictionary.get(y, domain_name_dictionary.get(np.NaN))
+        for y in domain.lower()
+    ]
 
 
 # TODO: put the max_length constant somewhere
@@ -66,11 +69,12 @@ def as_keras_metric(method):
         with tf.control_dependencies([update_op]):
             value = tf.identity(value)
         return value
+
     return wrapper
 
 
 def print_metrics(val_y: np.ndarray, predict_y: np.ndarray):
-    confmatrix: np.ndarray = sklearn.metrics.confusion_matrix(val_y, predict_y > .5)
+    confmatrix: np.ndarray = sklearn.metrics.confusion_matrix(val_y, predict_y > 0.5)
 
     tn, fp, fn, tp = confmatrix.ravel()
     num_pred_positives = tp + fp
@@ -88,8 +92,10 @@ def print_metrics(val_y: np.ndarray, predict_y: np.ndarray):
         precision, recall, fpr, fnr, f1))
 
     # or, just let sklearn do it for us, and even print a pretty table :)
-    report = sklearn.metrics.classification_report(val_y, predict_y > .5, labels=[0, 1], target_names=["benign", "DGA"])
+    report = sklearn.metrics.classification_report(
+        val_y, predict_y > 0.5, labels=[0, 1], target_names=["benign", "DGA"]
+    )
 
     logger.info(report)
     print(report)
-    return confmatrix, precision, recall, f1,
+    return confmatrix, precision, recall, f1

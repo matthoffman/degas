@@ -6,9 +6,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import tensorflow as tf
-import sklearn
-from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, History
-from tensorflow.python.keras.layers import Conv1D, MaxPooling1D, ThresholdedReLU, Embedding
+from tensorflow.python.keras.callbacks import (EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, History)
+from tensorflow.python.keras.layers import (Conv1D, MaxPooling1D, ThresholdedReLU, Embedding,)
 from tensorflow.python.keras.layers import Input, Flatten, Dense, Dropout
 from tensorflow.python.keras.models import Model
 from sklearn.model_selection import train_test_split, StratifiedKFold
@@ -30,39 +29,54 @@ def build_model() -> Model:
     """
     # a constant here representing the maximum expected length of a domain.
     max_length = 75
-    main_input = Input(shape=(max_length,), dtype='int32', name='main_input')
-    embedding = Embedding(input_dim=128, output_dim=128,
-                          input_length=max_length)(main_input)
-    conv1 = Conv1D(filters=128, kernel_size=3, padding='same', strides=1)(embedding)
+    main_input = Input(shape=(max_length,), dtype="int32", name="main_input")
+    embedding = Embedding(input_dim=128, output_dim=128, input_length=max_length)(main_input)
+    conv1 = Conv1D(filters=128, kernel_size=3, padding="same", strides=1)(embedding)
     thresh1 = ThresholdedReLU(1e-6)(conv1)
-    max_pool1 = MaxPooling1D(pool_size=2, padding='same')(thresh1)
-    conv2 = Conv1D(filters=128, kernel_size=2, padding='same', strides=1)(max_pool1)
+    max_pool1 = MaxPooling1D(pool_size=2, padding="same")(thresh1)
+    conv2 = Conv1D(filters=128, kernel_size=2, padding="same", strides=1)(max_pool1)
     thresh2 = ThresholdedReLU(1e-6)(conv2)
-    max_pool2 = MaxPooling1D(pool_size=2, padding='same')(thresh2)
+    max_pool2 = MaxPooling1D(pool_size=2, padding="same")(thresh2)
     flatten = Flatten()(max_pool2)
     fc = Dense(64)(flatten)
     thresh_fc = ThresholdedReLU(1e-6)(fc)
     drop = Dropout(0.5)(thresh_fc)
-    output = Dense(1, activation='sigmoid')(drop)
+    output = Dense(1, activation="sigmoid")(drop)
     model = Model(inputs=main_input, outputs=output)
     precision = as_keras_metric(tf.metrics.precision)
     recall = as_keras_metric(tf.metrics.recall)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['mae', 'mean_squared_error', 'acc', precision,
-                                                                         recall])
+    model.compile(
+        loss="binary_crossentropy",
+        optimizer="adam",
+        metrics=["mae", "mean_squared_error", "acc", precision, recall],
+    )
     return model
 
 
 def get_callbacks(model_filename, patience_stopping=5, patience_lr=10):
-    early_stopping = EarlyStopping(monitor='val_loss', patience=patience_stopping, verbose=1)
-    mcp_save = ModelCheckpoint(model_filename, save_best_only=True, monitor='val_loss', mode='min')
-    reduce_lr_loss = ReduceLROnPlateau(monitor='loss', factor=0.1, patience=patience_lr, verbose=1, epsilon=1e-4,
-                                       mode='min')
+    early_stopping = EarlyStopping(monitor="val_loss", patience=patience_stopping, verbose=1)
+    mcp_save = ModelCheckpoint(model_filename, save_best_only=True, monitor="val_loss", mode="min")
+    reduce_lr_loss = ReduceLROnPlateau(
+        monitor="loss",
+        factor=0.1,
+        patience=patience_lr,
+        verbose=1,
+        epsilon=1e-4,
+        mode="min",
+    )
     return [early_stopping, mcp_save, reduce_lr_loss]
 
 
 def fit_and_evaluate(model: Model, model_filename: str, t_x, val_x, t_y, val_y, epochs=20, batch_size=128) -> History:
-    results = model.fit(t_x, t_y, epochs=epochs, batch_size=batch_size, callbacks=get_callbacks(model_filename),
-                        verbose=1, validation_data=[val_x, val_y])
+    results = model.fit(
+        t_x,
+        t_y,
+        epochs=epochs,
+        batch_size=batch_size,
+        callbacks=get_callbacks(model_filename),
+        verbose=1,
+        validation_data=[val_x, val_y],
+    )
     logging.info("Score against validation set: %s", model.evaluate(val_x, val_y))
     return results
 
@@ -70,13 +84,16 @@ def fit_and_evaluate(model: Model, model_filename: str, t_x, val_x, t_y, val_y, 
 def export_model(model: Model):
     # Ignore dropout at inference
     tf.keras.backend.set_learning_phase(0)
-    export_path = os.path.join('models', 'degas', '1')  # TODO: how/when do we want to increment versions?
+    export_path = os.path.join(
+        "models", "degas", "1"
+    )  # TODO: how/when do we want to increment versions?
     with tf.keras.backend.get_session() as sess:
         tf.saved_model.simple_save(
             sess,
             export_path,
-            inputs={'input_image': model.input},
-            outputs={t.name: t for t in model.outputs})
+            inputs={"input_image": model.input},
+            outputs={t.name: t for t in model.outputs},
+        )
 
 
 def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> History:
@@ -128,7 +145,7 @@ def run_kfold(data: pd.DataFrame, num_epochs=100, kfold_splits=2, batch_size=256
         weights_filename = "nyu_model_fold" + str(i) + "_weights.h5"
         history: History = fit_and_evaluate(model, weights_filename, t_x, val_x, t_y, val_y, num_epochs, batch_size)
         model_history.append(history)
-        accuracy_history = history.history['acc']
+        accuracy_history = history.history["acc"]
         # val_accuracy_history = history.history['val_acc']
         logger.info("Last training accuracy: " + str(accuracy_history[-1]))
 

@@ -2,6 +2,5 @@
 # some dev tools:
 pylint
 mypy
-black
 pytest
 

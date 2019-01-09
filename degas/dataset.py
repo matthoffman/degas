@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import logging
+from typing import List
+from csv import QUOTE_ALL
 from pathlib import Path
 from glob import glob
 import pandas as pd
-from typing import List
-from csv import QUOTE_ALL
-# from sklearn.model_selection import train_test_split
 
 
 ##########################################
@@ -13,9 +12,9 @@ from csv import QUOTE_ALL
 ##########################################
 
 # key for our dataframe that contains the data (the domains)
-DATA_KEY = 'domain'
+DATA_KEY = "domain"
 # key for our dataframe that contains the labels (whether it's a DGA or not)
-LABEL_KEY = 'class'
+LABEL_KEY = "class"
 DATASET_FILENAME = "dataset.csv.gz"
 
 
@@ -24,29 +23,36 @@ def process(input_filepath: str, output_filepath: str) -> None:
         cleaned data ready to be analyzed (saved in ../processed).
     """
     logger = logging.getLogger(__name__)
-    logger.info('making final data set from raw data')
+    logger.info("making final data set from raw data")
 
     logger.info("Loading DGA datasets")
-    dgas = concat([
-        # good wordlist, but the code is GPL so by the default the data is as well (although it's compiled from a
-        # variety of public-domain sources)
-        # load_andrewaeva(join(input_filepath, "andrewaeva-dga-list.csv.gz")),
-        load_bambenek(join(input_filepath, "bambenek.*.csv.gz")),
-        load_subset(join(input_filepath, "subset.csv.gz")),
-        load_other_dga(join(input_filepath, "dga-*.csv.gz"))],
-        dga=True)
+    dgas = concat(
+        [
+            # good wordlist, but the code is GPL so by the default the data is as well (although it's compiled from a
+            # variety of public-domain sources)
+            # load_andrewaeva(join(input_filepath, "andrewaeva-dga-list.csv.gz")),
+            load_bambenek(join(input_filepath, "bambenek.*.csv.gz")),
+            load_subset(join(input_filepath, "subset.csv.gz")),
+            load_other_dga(join(input_filepath, "dga-*.csv.gz")),
+        ],
+        dga=True,
+    )
 
     logger.info("Loading benign domain datasets")
-    benign = concat([load_cisco(join(input_filepath, "cisco-umbrella-top-1m.csv.zip")),
-                     load_majestic_million(join(input_filepath, "majestic_million.csv.gz")),
-                     load_alexa(join(input_filepath, "alexa.csv.gz")),
-                     load_top10million(join(input_filepath, "top10milliondomains.csv.zip"))],
-                    dga=False)
+    benign = concat(
+        [
+            load_cisco(join(input_filepath, "cisco-umbrella-top-1m.csv.zip")),
+            load_majestic_million(join(input_filepath, "majestic_million.csv.gz")),
+            load_alexa(join(input_filepath, "alexa.csv.gz")),
+            load_top10million(join(input_filepath, "top10milliondomains.csv.zip")),
+        ],
+        dga=False,
+    )
 
     logger.info("Loaded a total of %i DGA domains and %i benign domains", len(dgas), len(benign))
     logger.info("There are %i *unique* benign domains", len(benign.drop_duplicates()))
     full: pd.DataFrame = pd.concat([dgas, benign], ignore_index=True)
-    logger.info("created a dataset of %i records (of which %.2f%% are DGAs)", len(full), full[LABEL_KEY].mean()*100)
+    logger.info("created a dataset of %i records (of which %.2f%% are DGAs)", len(full), full[LABEL_KEY].mean() * 100)
     full.to_csv(join(output_filepath, DATASET_FILENAME), header=True, index=False, compression="gzip")
     logger.info("dataset creation complete. dataset.csv.gz written to %s", output_filepath)
 
@@ -130,8 +136,14 @@ def load_subset(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
     logging.info(" - reading %s", path)
-    subset = pd.read_csv(path, delimiter=chr(1), names=[DATA_KEY, "desc", "class"], usecols=[0, 2], header=None,
-                         error_bad_lines=False)
+    subset = pd.read_csv(
+        path,
+        delimiter=chr(1),
+        names=[DATA_KEY, "desc", "class"],
+        usecols=[0, 2],
+        header=None,
+        error_bad_lines=False,
+    )
     logging.info(" - read %i records from %s", len(subset), path)
     return subset
 
