@@ -23,7 +23,6 @@ def process(input_filepath: str, output_filepath: str) -> None:
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
-
     logger = logging.getLogger(__name__)
     logger.info('making final data set from raw data')
 
@@ -32,8 +31,10 @@ def process(input_filepath: str, output_filepath: str) -> None:
         # good wordlist, but the code is GPL so by the default the data is as well (although it's compiled from a
         # variety of public-domain sources)
         # load_andrewaeva(join(input_filepath, "andrewaeva-dga-list.csv.gz")),
-                   load_bambenek(join(input_filepath, "bambenek.*.csv.gz"))],
-                  dga=True)
+        load_bambenek(join(input_filepath, "bambenek.*.csv.gz")),
+        load_subset(join(input_filepath, "subset.csv.gz")),
+        load_other_dga(join(input_filepath, "dga-*.csv.gz"))],
+        dga=True)
 
     logger.info("Loading benign domain datasets")
     benign = concat([load_cisco(join(input_filepath, "cisco-umbrella-top-1m.csv.zip")),
@@ -71,8 +72,14 @@ def load_top10million(path: Path) -> pd.DataFrame:
     "Rank","Domain","Open Page Rank"
     "1","facebook.com","10.00"
     """
+    if not path.exists():
+        logging.info("No file named '%s' found, skipping", path)
+        return pd.DataFrame()
+
     logging.info(" - reading %s", path)
-    df = pd.read_csv(path, names=[DATA_KEY], usecols=[1], skiprows=1, quoting=QUOTE_ALL)
+    df = pd.read_csv(path, quoting=QUOTE_ALL)
+    df.drop(columns=["Rank", "Open Page Rank"], inplace=True)
+    df.rename(index=str, columns={"Domain": DATA_KEY}, inplace=True)
     logging.info(" - read %i records from %s", len(df), path)
     return df
 
@@ -86,10 +93,31 @@ def load_majestic_million(path: Path) -> pd.DataFrame:
     GlobalRank,TldRank,Domain,TLD,RefSubNets,RefIPs,IDN_Domain,IDN_TLD,PrevGlobalRank,PrevTldRank,PrevRefSubNets,PrevRefIPs
 1,1,google.com,com,487267,3086039,google.com,com,1,1,487043,3085865
     """
+    if not path.exists():
+        logging.info("No file named '%s' found, skipping", path)
+        return pd.DataFrame()
+
     logging.info(" - reading %s", path)
     df = pd.read_csv(path, names=[DATA_KEY], usecols=[2], skiprows=1)
     logging.info(" - read %i records from %s", len(df), path)
     return df
+
+
+def load_other_dga(path: Path) -> pd.DataFrame:
+    """ Load other files containing DGA domains from not-previously-known sources
+
+    We'll load them by glob pattern, and expect that they are comma-separated with domains in the first column, with no
+    header.
+    We'll treat lines that start with '#' as comments
+    """
+    dga = pd.DataFrame()
+    for p in glob(str(path)):
+        logging.info(" - reading %s", p)
+        this_dga = pd.read_csv(p, header=None, comment="#", names=[DATA_KEY], usecols=[0])
+        logging.info(" - read %i records from %s", len(this_dga), path)
+        dga = dga.append(this_dga, ignore_index=True, verify_integrity=True)
+    dga.drop_duplicates(inplace=True)
+    return dga
 
 
 def load_subset(path: Path) -> pd.DataFrame:
@@ -97,6 +125,10 @@ def load_subset(path: Path) -> pd.DataFrame:
     """
     # chr(1) is ctrl-A, which is a pretty vile separator char, TBH. I mean, couldn't it at least be ctrl-^
     # ("record separator") or ctrl-_ ("unit separator")?
+    if not path.exists():
+        logging.info("No file named '%s' found, skipping", path)
+        return pd.DataFrame()
+
     logging.info(" - reading %s", path)
     subset = pd.read_csv(path, delimiter=chr(1), names=[DATA_KEY, "desc", "class"], usecols=[0, 2], header=None,
                          error_bad_lines=False)
@@ -111,6 +143,10 @@ def load_andrewaeva(path: Path) -> pd.DataFrame:
         generated it.
         For our purposes, we don't care which algorithm generated the domain, so we'll just pull the first column.
     """
+    if not path.exists():
+        logging.info("No file named '%s' found, skipping", path)
+        return pd.DataFrame()
+
     logging.info(" - reading %s", path)
     dga1 = pd.read_csv(path, delimiter="\\s+", header=None, names=[DATA_KEY, "dga_type"], usecols=[0])
     logging.info(" - read %i records from %s", len(dga1), path)
@@ -139,6 +175,10 @@ def load_bambenek(path: Path) -> pd.DataFrame:
 def load_cisco(path: Path) -> pd.DataFrame:
     """ Cisco publishes a "top 1 million URLs" dataset. Being popularity-based, we assume that none of these are DGAs.
     """
+    if not path.exists():
+        logging.info("No file named '%s' found, skipping", path)
+        return pd.DataFrame()
+
     logging.info(" - reading %s", path)
     benign = pd.read_csv(path, header=None, comment="#", names=["rank", DATA_KEY], usecols=[1])
     logging.info(" - read %i records from %s", len(benign), path)
@@ -150,6 +190,10 @@ def load_alexa(path: Path) -> pd.DataFrame:
     Load the top 1 million websites according to Alexa.
     This is a space-separated file with 2 columns, domain and rank (I believe?). We only care about the domain.
     """
+    if not path.exists():
+        logging.info("No file named '%s' found, skipping", path)
+        return pd.DataFrame()
+
     logging.info(" - reading %s", path)
     df = pd.read_csv(path, header=None, delimiter="\\s+", names=[DATA_KEY], usecols=[0])
     logging.info(" - read %i records from %s", len(df), path)

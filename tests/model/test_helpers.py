@@ -4,8 +4,8 @@ import sklearn
 
 
 def test_print_metrics():
-    y_true = [0, 1, 0, 1]
-    y_pred = [1, 1, 1, 0]
+    y_true = np.array([0, 1, 0, 1])
+    y_pred = np.array([1, 1, 1, 0])
 
     confusion_matrix, precision, recall, f1 = degas.model.train.print_metrics(y_true, y_pred)
     # figure out what they should be

@@ -8,8 +8,3 @@ typing
 Click
 matplotlib
 seaborn
-# some dev tools:
-pylint
-mypy
-black
-pytest

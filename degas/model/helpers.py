@@ -1,11 +1,12 @@
-from tensorflow.python.keras.preprocessing import sequence
 import logging
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import sklearn
 from tensorflow.python.keras.preprocessing import sequence
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def domain_to_ints(domain: str) -> List[int]:
 
 
 # TODO: put the max_length constant somewhere
-def prep_dataframe(data: pd.DataFrame, max_length=75) -> Tuple[np.ndarray, np.ndarray] :
+def prep_dataframe(data: pd.DataFrame, max_length=75) -> Tuple[np.ndarray, np.ndarray]:
     X = (data["domain"]
          .apply(lambda x: domain_to_ints(x))
          .pipe(sequence.pad_sequences, maxlen=max_length))
@@ -53,8 +54,23 @@ def prep_data(data: np.ndarray, max_length=75) -> np.ndarray:
         maxlen=max_length)
 
 
+def as_keras_metric(method):
+    """ from https://stackoverflow.com/questions/43076609/how-to-calculate-precision-and-recall-in-keras """
+    import functools
+
+    @functools.wraps(method)
+    def wrapper(self, args, **kwargs):
+        """ Wrapper for turning tensorflow metrics into keras metrics """
+        value, update_op = method(self, args, **kwargs)
+        tf.keras.backend.get_session().run(tf.local_variables_initializer())
+        with tf.control_dependencies([update_op]):
+            value = tf.identity(value)
+        return value
+    return wrapper
+
+
 def print_metrics(val_y: np.ndarray, predict_y: np.ndarray):
-    confmatrix: np.ndarray = sklearn.metrics.confusion_matrix(val_y, predict_y)
+    confmatrix: np.ndarray = sklearn.metrics.confusion_matrix(val_y, predict_y > .5)
 
     tn, fp, fn, tp = confmatrix.ravel()
     num_pred_positives = tp + fp
@@ -72,9 +88,8 @@ def print_metrics(val_y: np.ndarray, predict_y: np.ndarray):
         precision, recall, fpr, fnr, f1))
 
     # or, just let sklearn do it for us, and even print a pretty table :)
-    report = sklearn.metrics.classification_report(val_y, predict_y)
+    report = sklearn.metrics.classification_report(val_y, predict_y > .5, labels=[0, 1], target_names=["benign", "DGA"])
+
     logger.info(report)
     print(report)
-    return confmatrix, precision, recall, f1
-
-
+    return confmatrix, precision, recall, f1,

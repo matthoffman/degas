@@ -13,27 +13,12 @@ from tensorflow.python.keras.layers import Input, Flatten, Dense, Dropout
 from tensorflow.python.keras.models import Model
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
-from .helpers import prep_dataframe, prep_data, print_metrics
+from .helpers import prep_dataframe, prep_data, print_metrics, as_keras_metric
 
 # TODO: temporarily commenting this out, but worth revisiting to remove the magic strings
 # from ..dataset import DATA_KEY, LABEL_KEY, DATASET_FILENAME
 
 logger = logging.getLogger(__name__)
-
-
-def as_keras_metric(method):
-    """ from https://stackoverflow.com/questions/43076609/how-to-calculate-precision-and-recall-in-keras """
-    import functools
-
-    @functools.wraps(method)
-    def wrapper(self, args, **kwargs):
-        """ Wrapper for turning tensorflow metrics into keras metrics """
-        value, update_op = method(self, args, **kwargs)
-        tf.keras.backend.get_session().run(tf.local_variables_initializer())
-        with tf.control_dependencies([update_op]):
-            value = tf.identity(value)
-        return value
-    return wrapper
 
 
 def build_model() -> Model:
@@ -85,7 +70,7 @@ def fit_and_evaluate(model: Model, model_filename: str, t_x, val_x, t_y, val_y, 
 def export_model(model: Model):
     # Ignore dropout at inference
     tf.keras.backend.set_learning_phase(0)
-    export_path = os.path.join('models', 'degas', '1')
+    export_path = os.path.join('models', 'degas', '1')  # TODO: how/when do we want to increment versions?
     with tf.keras.backend.get_session() as sess:
         tf.saved_model.simple_save(
             sess,
@@ -110,11 +95,11 @@ def run(data: pd.DataFrame, num_epochs=100, batch_size=256, max_length=75) -> Hi
     model_filename = os.path.join("models", "degas", "nyu_model.h5")
     history: History = fit_and_evaluate(model, model_filename, t_x, val_x, t_y, val_y, num_epochs, batch_size)
     logger.info("Last training history: " + str(history))
+    logger.info("Exporting model for serving")
+    export_model(model)
 
     predict_y = model.predict(val_x, batch_size=batch_size, verbose=1)
-    print_metrics(val_y, predict_y > .5)
-
-    export_model(model)
+    print_metrics(val_y, predict_y)
 
     return history
 
