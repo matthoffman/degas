@@ -8,3 +8,4 @@ typing
 Click
 matplotlib
 seaborn
+flask

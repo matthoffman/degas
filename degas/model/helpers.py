@@ -3,8 +3,8 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import sklearn
+import tensorflow as tf
 from tensorflow.python.keras.preprocessing import sequence
 
 
@@ -53,8 +53,8 @@ def prep_dataframe(data: pd.DataFrame, max_length=75) -> Tuple[np.ndarray, np.nd
 def prep_data(data: np.ndarray, max_length=75) -> np.ndarray:
     """ TODO: DRY; combine this with prep_dataframe above"""
     return sequence.pad_sequences(
-        np.array([domain_to_ints(x) for x in data]),
-        maxlen=max_length)
+        np.array([domain_to_ints(x) for x in data]), maxlen=max_length
+    )
 
 
 def as_keras_metric(method):
