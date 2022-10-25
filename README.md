@@ -17,6 +17,7 @@ Pipenv:
 pipenv install -r requirements.txt
 pipenv shell
 ```
+Make sure  h5py with version 2.10.0 in your env. 
 
 Virtualenv is similar, but there's really no reason to use virtualenv instead of Pipenv anymore.
 
