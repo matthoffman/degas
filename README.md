@@ -55,12 +55,22 @@ inference is to use [Tensorflow Serving](https://www.tensorflow.org/serving/).
 
 You should be able to serve it using:
 ```
-docker run -p 8501:8501 \
-  --mount type=bind,source=models/degas,target=/models/degas\
-  -e MODEL_NAME=degas -t tensorflow/serving
+'docker run -p 8501:8501 \
+  --mount type=bind,source=/Users/yourUserName/PycharmProjects/degas/models/degas,target=/models/degas\
+  -e MODEL_NAME=degas -t tensorflow/serving:1.12.0'
 ```
 See [Tensorflow Serving docs](https://www.tensorflow.org/serving/docker) for more information about available options.
 
+show model info:
+http://localhost:8501/v1/models/degas
+model metadata:
+http://localhost:8501/v1/models/degas/metadata
+make a predict:
+http://localhost:8501/v1/models/degas:predict
+post json is :
+{
+  "instances": [ "www.google.com", "www.a2x43v89es0-1.com", "www.twitter.com" ]
+}
 
 # About Degas
 
