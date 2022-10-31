@@ -90,7 +90,7 @@ post json is :
 
 ```
 It represents domains as bellow：
-"www.google.com", "www.a2x43v89es0-1.com", "www.twitter.com" 
+"www.google.com", "a2x43v89es01.com", "www.twitter.com" 
 
 and the response will be:
 ```
