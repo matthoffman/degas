@@ -23,6 +23,8 @@ Virtualenv is similar, but there's really no reason to use virtualenv instead of
 
 
 ## Retraining the model
+### the model in this repo was already retrained on oct. 2022.
+
 There is a trained model checked into the `models` directory. If you'd like to train your own, you'll first need to 
 download the training data from S3: 
 ```
@@ -48,16 +50,17 @@ potentially run it for, say, 5 epochs and still get good accuracy with half the 
 `python degas/runner train-model --epochs 5 data/processed `
 
 
-## Making predictions
+## Making predictions (EDITED: specified version of tensorflow and tensorflow serving)
 
 Since this project uses Tensorflow as the underlying deep learning library, the recommended way to use this for 
 inference is to use [Tensorflow Serving](https://www.tensorflow.org/serving/). 
 
 You should be able to serve it using:
+
 ```
 'docker run -p 8501:8501 \
   --mount type=bind,source=/Users/yourUserName/PycharmProjects/degas/models/degas,target=/models/degas\
-  -e MODEL_NAME=degas -t tensorflow/serving:1.12.0'
+  -e MODEL_NAME=degas -t tensorflow/serving:1.11.0'
 ```
 See [Tensorflow Serving docs](https://www.tensorflow.org/serving/docker) for more information about available options.
 
@@ -68,9 +71,46 @@ http://localhost:8501/v1/models/degas/metadata
 make a predict:
 http://localhost:8501/v1/models/degas:predict
 post json is :
+
+```
 {
-  "instances": [ "www.google.com", "www.a2x43v89es0-1.com", "www.twitter.com" ]
+ "instances": [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,37,37,37,12,21,29,29,21,26,19,12
+,17,29,27]
+,[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,15,2,38,4,3,36,8,9,19,33,0,1,12
+,17,29,27]
+,[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+,0,0,0,0,0,0,0,0,0,0,0,0,37,37,37,12,34,37,23,34,34,19,32,12
+,17,29,27]]
 }
+
+```
+It represents domains as bellow：
+"www.google.com", "www.a2x43v89es0-1.com", "www.twitter.com" 
+
+and the response will be:
+```
+{
+    "predictions": [
+        [
+            4.54876e-11
+        ],
+        [
+            0.723077
+        ],
+        [
+            2.9277e-18
+        ]
+    ]
+}
+```
+
+so the result of predictions to "www.google.com", "www.a2x43v89es0-1.com", "www.twitter.com" is: false, ture, false.
+
 
 # About Degas
 
