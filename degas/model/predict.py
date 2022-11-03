@@ -34,12 +34,13 @@ def load_model(version=1) -> Model:
     return model
 
 
-def predict(model: Model, domains: np.ndarray) -> np.ndarray:
+def predict(model: Model, domains: np.ndarray, batch_size: int = 32, steps = None,  max_queue_size: int = 10,  workers: int = 1) -> np.ndarray:
     """
     Given a list of domains as input, returns a list of booleans, where True means it is predicted to be a DGA, and
     false means it is predicted to be benign
     """
-    predictions = model.predict_on_batch(prep_data(domains))
+    predictions = model.predict(prep_data(domains), batch_size=batch_size,steps=steps, max_queue_size=max_queue_size, workers=workers)
+    #predictions = model.predict_on_batch(prep_data(domains))
     return predictions
 
 

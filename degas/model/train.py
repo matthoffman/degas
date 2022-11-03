@@ -153,6 +153,7 @@ def run_kfold(data: pd.DataFrame, num_epochs=100, kfold_splits=2, batch_size=256
 
 
 def main(input_filepath: str, epochs: int = 100, kfold_splits: int = 3) -> None:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
     logging.info("load up some data")
     input_path = Path(input_filepath)
     # if the input was a directory, add our default filename.
